@@ -126,8 +126,8 @@ def attackTest( model, device, test_loader, epsilon ):
     # Return the accuracy and an adversarial example
     return final_acc, adv_examples
 
-# Download/create test data from QMNIST dataset
-test_data = datasets.QMNIST(
+# Download/create test data from MNIST dataset
+test_data = datasets.MNIST(
     root="data",
     train=False,
     download=True,
@@ -174,38 +174,38 @@ ax2.set_xlabel("Epsilon")
 ax2.set_ylabel("Accuracy")
 plt.show()
 
-# # Plot several examples of adversarial samples at each epsilon
-# cnt = 0
-# plt.figure(figsize=(8,10))
-# plt.title("Self trained examples")
-# for i in range(len(epsilons)):
-#     for j in range(len(examples[i])):
-#         cnt += 1
-#         plt.subplot(len(epsilons),len(examples[0]),cnt)
-#         plt.xticks([], [])
-#         plt.yticks([], [])
-#         if j == 0:
-#             plt.ylabel("Eps: {}".format(epsilons[i]), fontsize=14)
-#         orig,adv,ex = examples[i][j]
-#         plt.title("{} -> {}".format(orig, adv))
-#         plt.imshow(ex, cmap="gray")
-# plt.tight_layout()
-# plt.show()
-#
-# # Plot several examples of adversarial samples at each epsilon
-# cnt = 0
-# plt.figure(figsize=(8,10))
-# plt.title("Pre-trained examples")
-# for i in range(len(epsilons)):
-#     for j in range(len(preExamples[i])):
-#         cnt += 1
-#         plt.subplot(len(epsilons),len(preExamples[0]),cnt)
-#         plt.xticks([], [])
-#         plt.yticks([], [])
-#         if j == 0:
-#             plt.ylabel("Eps: {}".format(epsilons[i]), fontsize=14)
-#         orig,adv,ex = preExamples[i][j]
-#         plt.title("{} -> {}".format(orig, adv))
-#         plt.imshow(ex, cmap="gray")
-# plt.tight_layout()
-# plt.show()
+# Plot several examples of adversarial samples at each epsilon
+cnt = 0
+plt.figure(figsize=(8,10))
+plt.title("Self trained examples")
+for i in range(len(epsilons)):
+    for j in range(len(examples[i])):
+        cnt += 1
+        plt.subplot(len(epsilons),len(examples[0]),cnt)
+        plt.xticks([], [])
+        plt.yticks([], [])
+        if j == 0:
+            plt.ylabel("Eps: {}".format(epsilons[i]), fontsize=14)
+        orig,adv,ex = examples[i][j]
+        plt.title("{} -> {}".format(orig, adv))
+        plt.imshow(ex, cmap="gray")
+plt.tight_layout()
+plt.show()
+
+# Plot several examples of adversarial samples at each epsilon
+cnt = 0
+plt.figure(figsize=(8,10))
+plt.title("Pre-trained examples")
+for i in range(len(epsilons)):
+    for j in range(len(preExamples[i])):
+        cnt += 1
+        plt.subplot(len(epsilons),len(preExamples[0]),cnt)
+        plt.xticks([], [])
+        plt.yticks([], [])
+        if j == 0:
+            plt.ylabel("Eps: {}".format(epsilons[i]), fontsize=14)
+        orig,adv,ex = preExamples[i][j]
+        plt.title("{} -> {}".format(orig, adv))
+        plt.imshow(ex, cmap="gray")
+plt.tight_layout()
+plt.show()

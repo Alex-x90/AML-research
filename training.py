@@ -109,15 +109,15 @@ def test_loop(dataloader, model, loss_fn):
     correct /= size
     print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
-# Download/create training/test data from QMNIST dataset
-training_data = datasets.QMNIST(
+# Download/create training/test data from MNIST dataset
+training_data = datasets.MNIST(
     root="data",
     train=True,
     download=True,
     transform=ToTensor(),
     # target_transform=Lambda(lambda y: torch.zeros(10, dtype=torch.float).scatter_(0, torch.tensor(y), value=1))
 )
-test_data = datasets.QMNIST(
+test_data = datasets.MNIST(
     root="data",
     train=False,
     download=True,
