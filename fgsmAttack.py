@@ -1,13 +1,11 @@
 import os
 import torch
 import numpy as np
-import torch.onnx as onnx
 import torchvision.models as models
 import matplotlib.pyplot as plt
 from torch import nn
-from torch.utils.data import Dataset
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import ToTensor, Lambda
 import torch.nn.functional as F
 

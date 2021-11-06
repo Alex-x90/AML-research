@@ -79,9 +79,9 @@ class Net(nn.Module):
 #defines training loop for NN
 def train_loop(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
-    for batch, (X, y) in enumerate(dataloader):
+    for batch, (x, y) in enumerate(dataloader):
         # Compute prediction and loss
-        pred = model(X)
+        pred = model(x)
         loss = loss_fn(pred, y)
 
         # Backpropagation
@@ -90,7 +90,7 @@ def train_loop(dataloader, model, loss_fn, optimizer):
         optimizer.step()
 
         if batch % 100 == 0:
-            loss, current = loss.item(), batch * len(X)
+            loss, current = loss.item(), batch * len(x)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
 #defines test loop for NN
