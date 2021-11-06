@@ -67,7 +67,7 @@ def attackTest(dataloader, model, loss_fn, epsilon):
 
     final_acc = correct/float(len(test_loader))
     print("Epsilon: {}\tTest Accuracy = {} / {} = {}".format(epsilon, correct, len(test_loader), final_acc))
-    return finall_acc
+    return final_acc
 
 test_data = datasets.MNIST(
     root="data",
