@@ -36,7 +36,8 @@ class Net(nn.Module):
         return F.log_softmax(x, dim=1)
 
 def pgd_linf(model, x, y, eps, alpha, num_iter, loss_fn):
-    x_adv = x.clone().detach().requires_grad_(True).to(x.device)
+    x_adv = x.clone().detach().requires_grad_(True).to(device)
+    y = y.to(device)
     for i in range(num_iter):
         _x_adv = x_adv.clone().detach().requires_grad_(True)
         loss = loss_fn(model(_x_adv), y)
@@ -57,6 +58,7 @@ def attackTest(dataloader, model, loss_fn, epsilon):
     correct = 0
 
     for X, y in dataloader:
+        X, y = X.to(device), y.to(device)
         x_adv = pgd_linf(model, X, y, epsilon, alpha, num_iter, loss_fn)
         with torch.no_grad():
             originalPred = model(X)
