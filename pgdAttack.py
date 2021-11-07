@@ -63,7 +63,7 @@ def attackTest(dataloader, model, loss_fn, epsilon):
         with torch.no_grad():
             originalPred = model(X)
             pred = model(x_adv)
-            correct += (pred.argmax(1) == y).type(torch.float).sum().item() == (originalPred.argmax(1) == y).type(torch.float).sum().item()
+            correct += (pred.argmax(1) == originalPred.argmax(1)).type(torch.float).sum().item()
 
     final_acc = correct/float(len(dataloader.dataset))
     print("Epsilon: {}\tTest Accuracy = {} / {} = {}".format(epsilon, correct, len(dataloader.dataset), final_acc))
