@@ -65,8 +65,8 @@ def attackTest(dataloader, model, loss_fn, epsilon):
             pred = model(x_adv)
             correct += (pred.argmax(1) == y).type(torch.float).sum().item() == (originalPred.argmax(1) == y).type(torch.float).sum().item()
 
-    final_acc = correct/float(len(test_loader))
-    print("Epsilon: {}\tTest Accuracy = {} / {} = {}".format(epsilon, correct, len(test_loader), final_acc))
+    final_acc = correct/float(len(dataloader.dataset))
+    print("Epsilon: {}\tTest Accuracy = {} / {} = {}".format(epsilon, correct, len(dataloader.dataset), final_acc))
     return final_acc
 
 test_data = datasets.MNIST(
