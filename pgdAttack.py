@@ -44,11 +44,9 @@ def pgd_linf(model, x, y, eps, alpha, num_iter, loss_fn):
         loss.backward()
 
         with torch.no_grad():
-            gradients = _x_adv.grad.sign() * alpha
-            x_adv += gradients
+            x_adv += _x_adv.grad.sign() * alpha
 
-        x_adv = torch.max(torch.min(x_adv, x + eps), x - eps)
-        x_adv = x_adv.clamp(0,1)
+        x_adv = torch.max(torch.min(x_adv, x + eps), x - eps).clamp(0,1)
 
     return x_adv.detach()
 
@@ -85,9 +83,19 @@ model = Net().to(device)
 model.load_state_dict(torch.load(modelName))
 model.eval()
 
+epsilons.insert(0, 0)
 accuracies = [1]
 examples = []
 
 for epsilon in epsilons:
     acc = attackTest(test_loader, model, loss_fn, epsilon)
     accuracies.append(acc)
+
+plt.figure(figsize=(5,5))
+plt.plot(epsilons, accuracies, "*-")
+plt.yticks(np.arange(0, 1.1, step=0.1))
+plt.xticks(np.arange(0, .35, step=0.05))
+plt.title("Accuracy vs Epsilon")
+plt.xlabel("Epsilon")
+plt.ylabel("Accuracy")
+plt.show()
