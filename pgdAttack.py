@@ -83,13 +83,14 @@ model = Net().to(device)
 model.load_state_dict(torch.load(modelName))
 model.eval()
 
-epsilons.insert(0, 0)
 accuracies = [1]
 examples = []
 
 for epsilon in epsilons:
     acc = attackTest(test_loader, model, loss_fn, epsilon)
     accuracies.append(acc)
+
+epsilons.insert(0, 0)
 
 plt.figure(figsize=(5,5))
 plt.plot(epsilons, accuracies, "*-")
