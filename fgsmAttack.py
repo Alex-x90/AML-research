@@ -13,25 +13,7 @@ import torch.nn.functional as F
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 epsilons = [0, .05, .1, .15, .2, .25, .3]
-pretrained_model = "lenet_mnist_model.pth"
-self_trained_model = "model_weights.pth"
-
-# Basic neural net class def
-class NeuralNetwork(nn.Module):
-    def __init__(self):
-        super(NeuralNetwork, self).__init__()
-        self.flatten = nn.Flatten()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(28*28, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 10),
-        )
-
-    def forward(self, x):
-        x = self.flatten(x)
-        return self.linear_relu_stack(x)
+modelName = "robust_model_weights.pth"
 
 # prebuilt neural net class def
 class Net(nn.Module):
@@ -135,16 +117,10 @@ test_data = datasets.MNIST(
 #loads training and testing data into dataloader objects
 test_loader = DataLoader(test_data, batch_size=1, shuffle=True)
 
-model = NeuralNetwork().to(device)
-model.load_state_dict(torch.load(self_trained_model))
+model = Net().to(device)
+model.load_state_dict(torch.load(modelName))
 model.eval()
 
-preModel = Net().to(device)
-preModel.load_state_dict(torch.load(pretrained_model))
-preModel.eval()
-
-preAccuracies = []
-preExamples = []
 accuracies = []
 examples = []
 
@@ -154,56 +130,11 @@ for eps in epsilons:
     accuracies.append(acc)
     examples.append(ex)
 
-    acc, ex = attackTest(preModel, device, test_loader, eps)
-    preAccuracies.append(acc)
-    preExamples.append(ex)
-
 plt.figure(figsize=(5,5))
-fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-fig.suptitle("Accuracy vs Epsilon")
-fig.tight_layout()
-ax1.set_title("pre-trained model")
-ax2.set_title("self-made model")
-ax1.plot(epsilons, preAccuracies, "*-")
-ax2.plot(epsilons, accuracies, "*-")
-ax1.set_xlabel("Epsilon")
-ax1.set_ylabel("Accuracy")
-ax2.set_xlabel("Epsilon")
-ax2.set_ylabel("Accuracy")
-plt.show()
-
-# Plot several examples of adversarial samples at each epsilon
-cnt = 0
-plt.figure(figsize=(8,10))
-plt.title("Self trained examples")
-for i in range(len(epsilons)):
-    for j in range(len(examples[i])):
-        cnt += 1
-        plt.subplot(len(epsilons),len(examples[0]),cnt)
-        plt.xticks([], [])
-        plt.yticks([], [])
-        if j == 0:
-            plt.ylabel("Eps: {}".format(epsilons[i]), fontsize=14)
-        orig,adv,ex = examples[i][j]
-        plt.title("{} -> {}".format(orig, adv))
-        plt.imshow(ex, cmap="gray")
-plt.tight_layout()
-plt.show()
-
-# Plot several examples of adversarial samples at each epsilon
-cnt = 0
-plt.figure(figsize=(8,10))
-plt.title("Pre-trained examples")
-for i in range(len(epsilons)):
-    for j in range(len(preExamples[i])):
-        cnt += 1
-        plt.subplot(len(epsilons),len(preExamples[0]),cnt)
-        plt.xticks([], [])
-        plt.yticks([], [])
-        if j == 0:
-            plt.ylabel("Eps: {}".format(epsilons[i]), fontsize=14)
-        orig,adv,ex = preExamples[i][j]
-        plt.title("{} -> {}".format(orig, adv))
-        plt.imshow(ex, cmap="gray")
-plt.tight_layout()
+plt.plot(epsilons, accuracies, "*-")
+plt.yticks(np.arange(0, 1.1, step=0.1))
+plt.xticks(np.arange(0, .35, step=0.05))
+plt.title("Accuracy vs Epsilon")
+plt.xlabel("Epsilon")
+plt.ylabel("Accuracy")
 plt.show()

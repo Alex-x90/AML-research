@@ -15,7 +15,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 epsilons = [.05, .1, .15, .2, .25, .3]
 alpha=1e-2
 num_iter=40
-modelName = "lenet_mnist_model.pth"
+modelName = "robust_model_weights.pth"
 
 class Net(nn.Module):
     def __init__(self):

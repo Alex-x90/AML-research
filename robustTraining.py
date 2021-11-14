@@ -4,7 +4,9 @@ import numpy as np
 import torch.onnx as onnx
 import torchvision.models as models
 import matplotlib.pyplot as plt
-from torch import nn
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 from torch.utils.data import Dataset
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
@@ -14,13 +16,13 @@ from torchvision.transforms import ToTensor, Lambda
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 epsilon = .3
-alpha=1e-2
+alpha=1e-3
 num_iter=40
 
 modelName = "robust_model_weights.pth"
 
 learning_rate = 1e-3
-epochs = 100
+epochs = 25
 
 class Net(nn.Module):
     def __init__(self):
@@ -60,8 +62,10 @@ def pgd_linf(model, x, y, eps, alpha, num_iter, loss_fn):
 def train_loop(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
     for batch, (x, y) in enumerate(dataloader):
+        x, y = x.to(device), y.to(device)
+
         # Compute prediction and loss
-        x_adv = pgd_linf(model, X, y, epsilon, alpha, num_iter, loss_fn)
+        x_adv = pgd_linf(model, x, y, epsilon, alpha, num_iter, loss_fn)
         pred = model(x_adv)
         loss = loss_fn(pred, y)
 
@@ -70,7 +74,7 @@ def train_loop(dataloader, model, loss_fn, optimizer):
         loss.backward()
         optimizer.step()
 
-        if batch % 100 == 0:
+        if batch % 6 == 0:
             loss, current = loss.item(), batch * len(x)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
@@ -81,6 +85,7 @@ def test_loop(dataloader, model, loss_fn):
 
     with torch.no_grad():
         for X, y in dataloader:
+            X, y = X.to(device), y.to(device)
             pred = model(X)
             test_loss += loss_fn(pred, y).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
