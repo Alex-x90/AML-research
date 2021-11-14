@@ -52,7 +52,6 @@ def pgd_linf(model, x, y, eps, alpha, num_iter, loss_fn):
 
 def attackTest(dataloader, model, loss_fn, epsilon):
     size = len(dataloader.dataset)
-    num_batches = len(dataloader)
     correct = 0
 
     for X, y in dataloader:
@@ -63,7 +62,7 @@ def attackTest(dataloader, model, loss_fn, epsilon):
             pred = model(x_adv)
             correct += (pred.argmax(1) == originalPred.argmax(1)).type(torch.float).sum().item()
 
-    final_acc = correct/float(len(dataloader.dataset))
+    final_acc = correct/size
     print("Epsilon: {}\tTest Accuracy = {} / {} = {}".format(epsilon, correct, len(dataloader.dataset), final_acc))
     return final_acc
 
@@ -77,7 +76,7 @@ test_data = datasets.MNIST(
 
 loss_fn = nn.CrossEntropyLoss()
 
-test_loader = DataLoader(test_data, batch_size=64, shuffle=True)
+test_loader = DataLoader(test_data, batch_size=1000, shuffle=True)
 
 model = Net().to(device)
 model.load_state_dict(torch.load(modelName))
