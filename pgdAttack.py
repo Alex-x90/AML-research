@@ -56,14 +56,16 @@ def attackTest(dataloader, model, loss_fn, epsilon):
 
     for X, y in dataloader:
         X, y = X.to(device), y.to(device)
-        if(epsilon!=0)
+        if(epsilon!=0):
             x_adv = pgd_linf(model, X, y, epsilon, alpha, num_iter, loss_fn)
         with torch.no_grad():
             originalPred = model(X)
-            if(epsilon!=0)
+            if(epsilon!=0):
                 pred = model(x_adv)
                 missclass += (pred.argmax(1) != originalPred.argmax(1)).type(torch.float).sum().item()
-            correct += (pred.argmax(1) != y).type(torch.float).sum().item()
+                correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            else:
+                correct += (originalPred.argmax(1) == y).type(torch.float).sum().item()
 
     final_acc = correct/size
     missclass_rate = missclass/size
@@ -91,16 +93,20 @@ accuracy = []
 
 for epsilon in epsilons:
     acc, miss = attackTest(test_loader, model, loss_fn, epsilon)
-    accuracies.append(acc)
+    accuracy.append(acc)
     missclass.append(miss)
 
 plt.figure(figsize=(5,5))
-fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-# fig.suptitle("Accuracy vs Epsilon")
+fig, (ax1, ax2) = plt.subplots(1, 2)
+ax1.set_xlim(-0.01,0.305)
+ax2.set_xlim(-0.01,0.305)
+ax1.set_ylim(0,1)
+ax2.set_ylim(0,1)
+fig.suptitle("PGD attack")
 fig.tight_layout()
-# ax1.set_title("Accuracy vs Epsilon")
-# ax2.set_title("self-made model")
-ax1.plot(epsilons, accuracies, "*-")
+ax1.set_title("Accuracy vs Epsilon")
+ax2.set_title("Missclassification rate vs Epsilon")
+ax1.plot(epsilons, accuracy, "*-")
 ax2.plot(epsilons, missclass, "*-")
 ax1.set_xlabel("Epsilon")
 ax1.set_ylabel("Accuracy")

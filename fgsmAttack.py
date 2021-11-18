@@ -47,8 +47,7 @@ def fgsm_attack(image, epsilon, data_grad):
 
 def attackTest( model, device, test_loader, epsilon ):
     # Accuracy counter
-    correct = 0
-    adv_examples = []
+    correct, missclass = 0, 0
 
     # Loop over all examples in test set
     for data, target in test_loader:
@@ -60,51 +59,39 @@ def attackTest( model, device, test_loader, epsilon ):
         data.requires_grad = True
 
         # Forward pass the data through the model
-        output = model(data)
-        init_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
+        init_pred = model(data)
 
-        # If the initial prediction is wrong, dont bother attacking, just move on
-        if init_pred.item() != target.item():
-            continue
+        if(epsilon!=0):
+            # Calculate the loss
+            loss = F.nll_loss(init_pred, target)
 
-        # Calculate the loss
-        loss = F.nll_loss(output, target)
+            # Zero all existing gradients
+            model.zero_grad()
 
-        # Zero all existing gradients
-        model.zero_grad()
+            # Calculate gradients of model in backward pass
+            loss.backward()
 
-        # Calculate gradients of model in backward pass
-        loss.backward()
+            # Collect datagrad
+            data_grad = data.grad.data
 
-        # Collect datagrad
-        data_grad = data.grad.data
-
-        # Call FGSM Attack
-        perturbed_data = fgsm_attack(data, epsilon, data_grad)
-
-        # Re-classify the perturbed image
-        output = model(perturbed_data)
+            # Call FGSM Attack
+            perturbed_data = fgsm_attack(data, epsilon, data_grad)
 
         # Check for success
-        final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
-        if final_pred.item() == target.item():
-            correct += 1
-            # Special case for saving 0 epsilon examples
-            if (epsilon == 0) and (len(adv_examples) < 5):
-                adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
+        if(epsilon!=0):
+            pred = model(perturbed_data)
+            missclass += (pred.argmax(1) != init_pred.argmax(1)).type(torch.float).sum().item()
+            correct += (pred.argmax(1) == target).type(torch.float).sum().item()
         else:
-            # Save some adv examples for visualization later
-            if len(adv_examples) < 5:
-                adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
+            correct += (init_pred.argmax(1) == target).type(torch.float).sum().item()
 
     # Calculate final accuracy for this epsilon
     final_acc = correct/float(len(test_loader))
+    missclass_rate = missclass/float(len(test_loader))
     print("Epsilon: {}\tTest Accuracy = {} / {} = {}".format(epsilon, correct, len(test_loader), final_acc))
 
     # Return the accuracy and an adversarial example
-    return final_acc, adv_examples
+    return final_acc, missclass_rate
 
 # Download/create test data from MNIST dataset
 test_data = datasets.MNIST(
@@ -121,20 +108,29 @@ model = Net().to(device)
 model.load_state_dict(torch.load(modelName))
 model.eval()
 
-accuracies = []
-examples = []
+accuracy = []
+missclass = []
 
 # Run test for each epsilon
-for eps in epsilons:
-    acc, ex = attackTest(model, device, test_loader, eps)
-    accuracies.append(acc)
-    examples.append(ex)
+for epsilon in epsilons:
+    acc, miss = attackTest(model, device, test_loader, epsilon)
+    accuracy.append(acc)
+    missclass.append(miss)
 
 plt.figure(figsize=(5,5))
-plt.plot(epsilons, accuracies, "*-")
-plt.yticks(np.arange(0, 1.1, step=0.1))
-plt.xticks(np.arange(0, .35, step=0.05))
-plt.title("Accuracy vs Epsilon")
-plt.xlabel("Epsilon")
-plt.ylabel("Accuracy")
+fig, (ax1, ax2) = plt.subplots(1, 2)
+ax1.set_xlim(-0.01,0.305)
+ax2.set_xlim(-0.01,0.305)
+ax1.set_ylim(0,1)
+ax2.set_ylim(0,1)
+fig.suptitle("FGSM attack")
+fig.tight_layout()
+ax1.set_title("Accuracy vs Epsilon")
+ax2.set_title("Missclassification rate vs Epsilon")
+ax1.plot(epsilons, accuracy, "*-")
+ax2.plot(epsilons, missclass, "*-")
+ax1.set_xlabel("Epsilon")
+ax1.set_ylabel("Accuracy")
+ax2.set_xlabel("Epsilon")
+ax2.set_ylabel("Missclassification rate")
 plt.show()
