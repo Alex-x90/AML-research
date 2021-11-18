@@ -12,7 +12,7 @@ import torch.nn.functional as F
 # Use GPU if available
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-epsilons = [.05, .1, .15, .2, .25, .3]
+epsilons = [0, .05, .1, .15, .2, .25, .3]
 alpha=1e-2
 num_iter=40
 modelName = "robust_model_weights.pth"
@@ -52,19 +52,23 @@ def pgd_linf(model, x, y, eps, alpha, num_iter, loss_fn):
 
 def attackTest(dataloader, model, loss_fn, epsilon):
     size = len(dataloader.dataset)
-    correct = 0
+    missclass, correct = 0, 0
 
     for X, y in dataloader:
         X, y = X.to(device), y.to(device)
-        x_adv = pgd_linf(model, X, y, epsilon, alpha, num_iter, loss_fn)
+        if(epsilon!=0)
+            x_adv = pgd_linf(model, X, y, epsilon, alpha, num_iter, loss_fn)
         with torch.no_grad():
             originalPred = model(X)
-            pred = model(x_adv)
-            correct += (pred.argmax(1) == originalPred.argmax(1)).type(torch.float).sum().item()
+            if(epsilon!=0)
+                pred = model(x_adv)
+                missclass += (pred.argmax(1) != originalPred.argmax(1)).type(torch.float).sum().item()
+            correct += (pred.argmax(1) != y).type(torch.float).sum().item()
 
     final_acc = correct/size
+    missclass_rate = missclass/size
     print("Epsilon: {}\tTest Accuracy = {} / {} = {}".format(epsilon, correct, len(dataloader.dataset), final_acc))
-    return final_acc
+    return final_acc, missclass_rate
 
 test_data = datasets.MNIST(
     root="data",
@@ -82,20 +86,24 @@ model = Net().to(device)
 model.load_state_dict(torch.load(modelName))
 model.eval()
 
-accuracies = [1]
-examples = []
+missclass = []
+accuracy = []
 
 for epsilon in epsilons:
-    acc = attackTest(test_loader, model, loss_fn, epsilon)
+    acc, miss = attackTest(test_loader, model, loss_fn, epsilon)
     accuracies.append(acc)
-
-epsilons.insert(0, 0)
+    missclass.append(miss)
 
 plt.figure(figsize=(5,5))
-plt.plot(epsilons, accuracies, "*-")
-plt.yticks(np.arange(0, 1.1, step=0.1))
-plt.xticks(np.arange(0, .35, step=0.05))
-plt.title("Accuracy vs Epsilon")
-plt.xlabel("Epsilon")
-plt.ylabel("Accuracy")
+fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+# fig.suptitle("Accuracy vs Epsilon")
+fig.tight_layout()
+# ax1.set_title("Accuracy vs Epsilon")
+# ax2.set_title("self-made model")
+ax1.plot(epsilons, accuracies, "*-")
+ax2.plot(epsilons, missclass, "*-")
+ax1.set_xlabel("Epsilon")
+ax1.set_ylabel("Accuracy")
+ax2.set_xlabel("Epsilon")
+ax2.set_ylabel("Missclassification rate")
 plt.show()
