@@ -16,7 +16,7 @@ from torchvision.transforms import ToTensor, Lambda
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 epsilon = .3
-alpha=1e-3
+step_size=1e-3
 num_iter=40
 
 modelName = "robust_model_weights.pth"
@@ -42,8 +42,8 @@ class Net(nn.Module):
         x = self.fc2(x)
         return F.log_softmax(x, dim=1)
 
-def pgd_linf(model, x, y, eps, alpha, num_iter, loss_fn):
-    x_adv = x.clone().detach().requires_grad_(True).to(device)
+def pgd_linf(model, x, y, eps, step_size, num_iter, loss_fn):
+    x_adv = torch.rand_like(x, requires_grad=True).to(device)
     y = y.to(device)
     for i in range(num_iter):
         _x_adv = x_adv.clone().detach().requires_grad_(True)
@@ -51,13 +51,12 @@ def pgd_linf(model, x, y, eps, alpha, num_iter, loss_fn):
         loss.backward()
 
         with torch.no_grad():
-            x_adv += _x_adv.grad.sign() * alpha
+            x_adv += _x_adv.grad.sign() * step_size
 
         x_adv = torch.max(torch.min(x_adv, x + eps), x - eps).clamp(0,1)
 
     return x_adv.detach()
 
-#TODO: finish converting train/test w/ pgd
 #defines training loop for NN
 def train_loop(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
@@ -65,7 +64,7 @@ def train_loop(dataloader, model, loss_fn, optimizer):
         x, y = x.to(device), y.to(device)
 
         # Compute prediction and loss
-        x_adv = pgd_linf(model, x, y, epsilon, alpha, num_iter, loss_fn)
+        x_adv = pgd_linf(model, x, y, epsilon, step_size, num_iter, loss_fn)
         pred = model(x_adv)
         loss = loss_fn(pred, y)
 
@@ -94,6 +93,8 @@ def test_loop(dataloader, model, loss_fn):
     correct /= size
     print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
+    return test_loss
+
 # Download/create training/test data from MNIST dataset
 training_data = datasets.MNIST(
     root="data",
@@ -118,12 +119,15 @@ model.load_state_dict(torch.load(modelName))
 
 # Initialize the loss/optimizer function
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(model.parameters(), lr=.001)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=.5, patience=1, threshold_mode='abs', eps=1e-10, cooldown=1)
 
 for t in range(epochs):
     print(f"Epoch {t+1}\n-------------------------------")
     train_loop(train_dataloader, model, loss_fn, optimizer)
-    test_loop(test_dataloader, model, loss_fn)
+    test_loss = test_loop(test_dataloader, model, loss_fn)
+
+    scheduler.step(test_loss)
 
 torch.save(model.state_dict(), modelName)
 
