@@ -13,37 +13,38 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import ToTensor, Lambda
 
 # Use GPU if available
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 epsilon = .3
-step_size=1e-3
-num_iter=40
+step_size = .01
+num_iter = 40
 
 modelName = "robust_model_weights.pth"
 
-learning_rate = 1e-3
-epochs = 25
+epochs = 10
+batch_size = 1000
+initial_lr = .001
 
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
-        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=5)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=5)
         self.conv2_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, 10)
+        self.fc1 = nn.Linear(256, 64)
+        self.fc2 = nn.Linear(64, 10)
 
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, 320)
+        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 4))
+        x = x.view(-1, 256)
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
         return F.log_softmax(x, dim=1)
 
 def pgd_linf(model, x, y, eps, step_size, num_iter, loss_fn):
-    x_adv = torch.rand_like(x, requires_grad=True).to(device)
+    x_adv = torch.rand_like(x, requires_grad=True, device = device)
     y = y.to(device)
     for i in range(num_iter):
         _x_adv = x_adv.clone().detach().requires_grad_(True)
@@ -69,7 +70,7 @@ def train_loop(dataloader, model, loss_fn, optimizer):
         loss = loss_fn(pred, y)
 
         # Backpropagation
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
 
@@ -111,16 +112,16 @@ test_data = datasets.MNIST(
     # target_transform=Lambda(lambda y: torch.zeros(10, dtype=torch.float).scatter_(0, torch.tensor(y), value=1))
 )
 
-train_dataloader = DataLoader(training_data, batch_size=1000, shuffle=True)
-test_dataloader = DataLoader(test_data, batch_size=1000, shuffle=True)
+train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=1)
+test_dataloader = DataLoader(test_data, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=1)
 
 model = Net().to(device)
 model.load_state_dict(torch.load(modelName))
 
 # Initialize the loss/optimizer function
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=.001)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=.5, patience=1, threshold_mode='abs', eps=1e-10, cooldown=1)
+optimizer = torch.optim.Adam(model.parameters(), lr=initial_lr)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=.5, patience=3, threshold_mode='rel')
 
 for t in range(epochs):
     print(f"Epoch {t+1}\n-------------------------------")
