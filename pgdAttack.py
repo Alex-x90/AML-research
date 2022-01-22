@@ -50,6 +50,30 @@ def pgd_linf(model, x, y, eps, alpha, num_iter, loss_fn):
 
     return x_adv.detach()
 
+def pgd_linf_wip(model, x, y, eps, alpha, beta, loss_fn, max_iter):
+    x_adv = x.clone().detach().requires_grad_(True).to(device)
+    y = y.to(device)
+    iters=0
+
+    condition=True
+    while(condition):
+        iters++
+        _x_adv = x_adv.clone().detach().requires_grad_(True)
+        loss = loss_fn(model(_x_adv), y)
+        loss.backward()
+
+        with torch.no_grad():
+            _x_adv += _x_adv.grad.sign() * alpha    # should this be -= _x_adv.grad * alpha instead?
+
+        _x_adv = torch.max(torch.min(_x_adv, x + eps), x - eps).clamp(0,1)   # projection
+
+        # figure out grad statement
+        condition = (loss_fn(model(_x_adv), y) > (loss_fn(model(x_adv), y) - .5*grad(_x_adv-x_adv))) && iters<max_iter
+        x_adv = _x_adv
+        alpha *= beta
+
+    return x_adv.detach(), iters
+
 def attackTest(dataloader, model, loss_fn, epsilon):
     size = len(dataloader.dataset)
     missclass, correct = 0, 0
