@@ -12,7 +12,7 @@ import torch.nn.functional as F
 # Use GPU if available
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-epsilons = [0, .05, .1, .15, .2, .25, .3]
+epsilons = [.05, .1, .15, .2, .25, .3] #[0, .05, .1, .15, .2, .25, .3]
 alpha=1e-2
 num_iter=40
 modelName = "robust_model_weights.pth"
@@ -54,34 +54,42 @@ def pgd_linf_wip(model, x, y, eps, alpha, beta, loss_fn, max_iter, min_diff):
     x_adv = x.clone().detach().requires_grad_(True).to(device)
     y = y.to(device)
     iters=0
+    diff=1
 
     loss = loss_fn(model(x_adv), y)
     loss.backward()
 
-    while iters<max_iter && torch.linalg.vector_norm(_x_adv-x_adv) > min_diff: #difference between new iteration and previous iteration is too small:
+    while iters<max_iter and diff > min_diff: #difference between new iteration and previous iteration is too small:
         iters+=1
 
+        # increase alpha by a step backwards to help go over curves. this could be a complete reset, but that might increase necessary calculation
         alpha *= 1.0/beta
 
-        condition=True
-        while(condition):
-            _x_adv = x_adv.clone().detach().requires_grad_(True)
-            loss = loss_fn(model(_x_adv), y)
-            loss.backward()
+        _x_adv = x_adv.clone().detach().requires_grad_(True)
+        loss = loss_fn(model(_x_adv), y)
+        loss.backward()
 
-            with torch.no_grad():
-                _x_adv += _x_adv.grad.sign() * alpha    # should this be -= _x_adv.grad * alpha instead?
 
-            _x_adv = torch.max(torch.min(_x_adv, x + eps), x - eps).clamp(0,1)   # projection
+        with torch.no_grad():
+            grad = _x_adv.grad.sign()		# should this not have .sign()?
+        _x_adv = x_adv + grad * alpha		# should this be -= grad * alpha instead?
 
-            # is the torch.inner right?
-            condition = (loss_fn(model(_x_adv), y) > (loss_fn(model(x_adv), y) - .5*torch.inner(_x_adv.grad.sign(), (_x_adv-x_adv)) ))
-            if(condition):
+        _x_adv = torch.max(torch.min(_x_adv, x + eps), x - eps).clamp(0,1)		# projection
+
+        print(grad.size(), torch.sub(_x_adv, x_adv).size())
+        temp3 = torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2))   # dot product
+        print(temp3)
+
+        # is the torch.inner right?
+        while(loss_fn(model(_x_adv), y).item() > loss_fn(model(x_adv), y).item() - .5*temp3):
                 alpha *= beta
+                _x_adv = x_adv + grad * alpha
 
-            x_adv = _x_adv
+        diff = torch.linalg.vector_norm(torch.sub(_x_adv, x_adv))
+        x_adv = _x_adv
+        exit()
 
-    return x_adv.detach(), iters
+    return x_adv.detach() #, iters
 
 def attackTest(dataloader, model, loss_fn, epsilon):
     size = len(dataloader.dataset)
@@ -90,7 +98,8 @@ def attackTest(dataloader, model, loss_fn, epsilon):
     for X, y in dataloader:
         X, y = X.to(device), y.to(device)
         if(epsilon!=0):
-            x_adv = pgd_linf(model, X, y, epsilon, alpha, num_iter, loss_fn)
+            # x_adv = pgd_linf(model, X, y, epsilon, alpha, num_iter, loss_fn)
+            x_adv = pgd_linf_wip(model, X, y, epsilon, alpha, num_iter, loss_fn, 500, 1e-4)
         with torch.no_grad():
             originalPred = model(X)
             if(epsilon!=0):
