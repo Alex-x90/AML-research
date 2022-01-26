@@ -66,28 +66,25 @@ def pgd_linf_wip(model, x, y, eps, alpha, beta, loss_fn, max_iter, min_diff):
         alpha *= 1.0/beta
 
         _x_adv = x_adv.clone().detach().requires_grad_(True)
-        loss = loss_fn(model(_x_adv), y)
+        loss = loss_fn(model(x_adv), y)
         loss.backward()
 
 
         with torch.no_grad():
-            grad = _x_adv.grad.sign()		# should this not have .sign()?
+            grad = x_adv.grad.sign()		# should this not have .sign()?
         _x_adv = x_adv + grad * alpha		# should this be -= grad * alpha instead?
-
         _x_adv = torch.max(torch.min(_x_adv, x + eps), x - eps).clamp(0,1)		# projection
 
-        print(grad.size(), torch.sub(_x_adv, x_adv).size())
-        temp3 = torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2))   # dot product
-        print(temp3)
+        # print(grad.size(), torch.sub(_x_adv, x_adv).size())
+        # temp3 = torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2))   # batch of dot products
 
-        # is the torch.inner right?
-        while(loss_fn(model(_x_adv), y).item() > loss_fn(model(x_adv), y).item() - .5*temp3):
+        while(loss_fn(model(_x_adv), y).item() > loss_fn(model(x_adv), y).item() - .5*torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2,3))): # single dot product
                 alpha *= beta
                 _x_adv = x_adv + grad * alpha
+                _x_adv = torch.max(torch.min(_x_adv, x + eps), x - eps).clamp(0,1)
 
         diff = torch.linalg.vector_norm(torch.sub(_x_adv, x_adv))
         x_adv = _x_adv
-        exit()
 
     return x_adv.detach() #, iters
 
@@ -124,7 +121,7 @@ test_data = datasets.MNIST(
 
 loss_fn = nn.CrossEntropyLoss()
 
-test_loader = DataLoader(test_data, batch_size=1000, shuffle=True)
+test_loader = DataLoader(test_data, batch_size=1, shuffle=True)
 
 model = Net().to(device)
 model.load_state_dict(torch.load(modelName))
