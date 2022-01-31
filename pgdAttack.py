@@ -72,18 +72,13 @@ def pgd_linf_wip(model, x, y, eps, alpha, beta, loss_fn, max_iter):
         _x_adv = x_adv + grad * alpha		# should this be -= grad * alpha instead?
         _x_adv = torch.max(torch.min(_x_adv, x + eps), x - eps).clamp(0,1)		# projection
 
-        # print(grad.size(), torch.sub(_x_adv, x_adv).size())
-        # temp3 = torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2))   # batch of dot products
-        # print(torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2,3)).item(), torch.matmul(grad.view(1,784), torch.sub(_x_adv, x_adv).view(784,1)).item())
-
-        while(loss_fn(model(_x_adv), y).item() < loss_fn(model(x_adv), y).item() - .5*torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2,3)).item()): # single dot product
+        # print(loss_fn(model(_x_adv), y).item(), loss_fn(model(x_adv), y).item() + .5*torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2,3)).item())
+        while(loss_fn(model(_x_adv), y).item() < loss_fn(model(x_adv), y).item() + .5*torch.sum(grad*torch.sub(x_adv, _x_adv),(1,2,3)).item()): # single dot product
             alpha *= beta
             _x_adv = x_adv + grad * alpha
             _x_adv = torch.max(torch.min(_x_adv, x + eps), x - eps).clamp(0,1)
 
         print(iters, loss.item())
-
-        # print(loss_fn(model(_x_adv), y).item(), loss_fn(model(x_adv), y).item() - .5*torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2,3)).item())
 
         x_adv = _x_adv.clone()
 
