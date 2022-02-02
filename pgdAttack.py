@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import ToTensor, Lambda
 import torch.nn.functional as F
 
+import time
+
 # Use GPU if available
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -55,7 +57,6 @@ def pgd_linf_wip(model, x, y, eps, alpha, beta, loss_fn, max_iter):
     x_adv = x.clone().detach().requires_grad_(True).to(device)
     y = y.to(device)
     iters=0
-    diff=1
 
     while iters<max_iter: #difference between new iteration and previous iteration is too small:
         iters+=1
@@ -63,26 +64,26 @@ def pgd_linf_wip(model, x, y, eps, alpha, beta, loss_fn, max_iter):
         # increase alpha by a step backwards to help go over curves. this could be a complete reset, but that might increase necessary calculation
         alpha *= 1.0/beta
 
-        _x_adv = x_adv.clone().detach().requires_grad_(True)
-        loss = loss_fn(model(_x_adv), y)
+        x_adv_new = x_adv.clone().detach().requires_grad_(True)
+        loss = loss_fn(model(x_adv_new), y)
         loss.backward()
 
         with torch.no_grad():
-            grad = _x_adv.grad.sign()		# should this not have .sign()?
-        _x_adv = x_adv + grad * alpha		# should this be -= grad * alpha instead?
-        _x_adv = torch.max(torch.min(_x_adv, x + eps), x - eps).clamp(0,1)		# projection
+            grad = x_adv_new.grad      		    # should this not have .sign()?
+        x_adv_new = x_adv + grad * alpha		# should this be -= grad * alpha instead?
+        x_adv_new = torch.max(torch.min(x_adv_new, x + eps), x - eps).clamp(0,1)		# projection
 
-        # print(loss_fn(model(_x_adv), y).item(), loss_fn(model(x_adv), y).item() + .5*torch.sum(grad*torch.sub(_x_adv, x_adv),(1,2,3)).item())
-        while(loss_fn(model(_x_adv), y).item() < loss_fn(model(x_adv), y).item() + .5*torch.sum(grad*torch.sub(x_adv, _x_adv),(1,2,3)).item()): # single dot product
+        old_loss = -loss_fn(model(x_adv), y).item()
+        while(-loss_fn(model(x_adv_new), y).item() > old_loss - .5*torch.sum(grad*torch.sub(x_adv_new, x_adv)).item()): # single dot product
             alpha *= beta
-            _x_adv = x_adv + grad * alpha
-            _x_adv = torch.max(torch.min(_x_adv, x + eps), x - eps).clamp(0,1)
+            x_adv_new = x_adv + grad * alpha
+            x_adv_new = torch.max(torch.min(x_adv_new, x + eps), x - eps).clamp(0,1)
 
-        print(iters, loss.item())
+        # print(iters, loss.item(), alpha)
 
-        x_adv = _x_adv.clone()
+        x_adv = x_adv_new
 
-    input("Press Enter to continue...")
+    # input("Press Enter to continue...")
     return x_adv.detach() #, iters
 
 def attackTest(dataloader, model, loss_fn, epsilon):
@@ -93,7 +94,7 @@ def attackTest(dataloader, model, loss_fn, epsilon):
         X, y = X.to(device), y.to(device)
         if(epsilon!=0):
             # x_adv = pgd_linf(model, X, y, epsilon, alpha, num_iter, loss_fn)
-            x_adv = pgd_linf_wip(model, X, y, epsilon, alpha, beta, loss_fn, 100)
+            x_adv = pgd_linf_wip(model, X, y, epsilon, alpha, beta, loss_fn, 50)
         with torch.no_grad():
             originalPred = model(X)
             if(epsilon!=0):
@@ -102,6 +103,7 @@ def attackTest(dataloader, model, loss_fn, epsilon):
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item()
             else:
                 correct += (originalPred.argmax(1) == y).type(torch.float).sum().item()
+        print("Missclass:", missclass, "Correct:",correct)
 
     final_acc = correct/size
     missclass_rate = missclass/size
@@ -128,7 +130,10 @@ missclass = []
 accuracy = []
 
 for epsilon in epsilons:
+    start_time = time.time()
     acc, miss = attackTest(test_loader, model, loss_fn, epsilon)
+    print("--- %s seconds ---" % (time.time() - start_time))
+
     accuracy.append(acc)
     missclass.append(miss)
 
