@@ -14,7 +14,7 @@ import time
 # Use GPU if available
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-epsilons = [.05, .1, .15, .2, .25, .3] #[0, .05, .1, .15, .2, .25, .3]
+epsilons = [.05] #[0, .05, .1, .15, .2, .25, .3]
 alpha=1e-2
 beta=0.5
 num_iter=40
@@ -53,7 +53,7 @@ def pgd_linf(model, x, y, eps, alpha, num_iter, loss_fn):
 
     return x_adv.detach()
 
-def pgd_linf_wip(model, x, y, eps, alpha, beta, loss_fn, max_iter):
+def pgd_linf_backtrack(model, x, y, eps, alpha, beta, loss_fn, max_iter):
     x_adv = x.clone().detach().requires_grad_(True).to(device)
     y = y.to(device)
     iters=0
@@ -70,20 +70,20 @@ def pgd_linf_wip(model, x, y, eps, alpha, beta, loss_fn, max_iter):
 
         with torch.no_grad():
             grad = x_adv_new.grad      		    # should this not have .sign()?
-        x_adv_new = x_adv + grad * alpha		# should this be -= grad * alpha instead?
-        x_adv_new = torch.max(torch.min(x_adv_new, x + eps), x - eps).clamp(0,1)		# projection
+            x_adv_new = x_adv + grad * alpha		# should this be -= grad * alpha instead?
+            x_adv_new = torch.max(torch.min(x_adv_new, x + eps), x - eps).clamp(0,1)		# projection
 
-        old_loss = -loss_fn(model(x_adv), y).item()
-        while(-loss_fn(model(x_adv_new), y).item() > old_loss - .5*torch.sum(grad*torch.sub(x_adv_new, x_adv)).item()): # single dot product
-            alpha *= beta
-            x_adv_new = x_adv + grad * alpha
-            x_adv_new = torch.max(torch.min(x_adv_new, x + eps), x - eps).clamp(0,1)
+            old_loss = -loss_fn(model(x_adv), y).item()
+            while(-loss_fn(model(x_adv_new), y).item() > old_loss - .5*torch.sum(grad*torch.sub(x_adv_new, x_adv)).item()): # single dot product
+                alpha *= beta
+                x_adv_new = x_adv + grad * alpha
+                x_adv_new = torch.max(torch.min(x_adv_new, x + eps), x - eps).clamp(0,1)
 
-        # print(iters, loss.item(), alpha)
+        print(iters, "\t", loss.item(), "\t", alpha, "   \t", torch.linalg.norm(torch.flatten(torch.sub(x_adv_new, x)), ord=float('inf')).item())
 
         x_adv = x_adv_new
 
-    # input("Press Enter to continue...")
+    input("Press Enter to continue...")
     return x_adv.detach() #, iters
 
 def attackTest(dataloader, model, loss_fn, epsilon):
@@ -94,7 +94,7 @@ def attackTest(dataloader, model, loss_fn, epsilon):
         X, y = X.to(device), y.to(device)
         if(epsilon!=0):
             # x_adv = pgd_linf(model, X, y, epsilon, alpha, num_iter, loss_fn)
-            x_adv = pgd_linf_wip(model, X, y, epsilon, alpha, beta, loss_fn, 50)
+            x_adv = pgd_linf_backtrack(model, X, y, epsilon, alpha, beta, loss_fn, 50)
         with torch.no_grad():
             originalPred = model(X)
             if(epsilon!=0):
@@ -103,7 +103,6 @@ def attackTest(dataloader, model, loss_fn, epsilon):
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item()
             else:
                 correct += (originalPred.argmax(1) == y).type(torch.float).sum().item()
-        print("Missclass:", missclass, "Correct:",correct)
 
     final_acc = correct/size
     missclass_rate = missclass/size
@@ -130,9 +129,9 @@ missclass = []
 accuracy = []
 
 for epsilon in epsilons:
-    start_time = time.time()
+    # start_time = time.time()
     acc, miss = attackTest(test_loader, model, loss_fn, epsilon)
-    print("--- %s seconds ---" % (time.time() - start_time))
+    # print("--- %s seconds ---" % (time.time() - start_time))
 
     accuracy.append(acc)
     missclass.append(miss)
